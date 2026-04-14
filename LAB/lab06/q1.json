@@ -1,0 +1,158 @@
+{
+  "name": "AI Resume Tailor Agent",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "Manual Trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "filePath": "/data/resume.pdf"
+      },
+      "id": "Read Resume",
+      "name": "Read Resume PDF",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "operation": "pdfToText"
+      },
+      "id": "Extract Text",
+      "name": "Extract Resume Text",
+      "type": "n8n-nodes-base.pdfExtract",
+      "typeVersion": 1,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const resume = items[0].json.text;\nconst jobDescription = `Paste job description here`;\nreturn [{ json: { resume, jobDescription } }];"
+      },
+      "id": "Prepare Input",
+      "name": "Prepare Resume + JD",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are an expert resume optimizer."
+          },
+          {
+            "role": "user",
+            "content": "Resume:\n{{$json[\"resume\"]}}\n\nJob Description:\n{{$json[\"jobDescription\"]}}\n\nTask:\n- Tailor the resume for ATS\n- Keep facts same\n- Add relevant keywords\n- Improve bullet points\n\nReturn clean structured resume in markdown."
+          }
+        ]
+      },
+      "id": "OpenAI",
+      "name": "Tailor Resume (AI)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1000, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const content = items[0].json.choices[0].message.content;\n\nconst html = `\n<html>\n<head>\n<style>\nbody { font-family: Arial; padding: 40px; }\nh1 { color: #2c3e50; }\n</style>\n</head>\n<body>\n${content.replace(/\\n/g, '<br>')}\n</body>\n</html>\n`;\n\nreturn [{ json: { html } }];"
+      },
+      "id": "Format HTML",
+      "name": "Convert to HTML",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "htmlToPdf",
+        "html": "={{$json[\"html\"]}}"
+      },
+      "id": "Generate PDF",
+      "name": "HTML to PDF",
+      "type": "n8n-nodes-base.pdfGenerator",
+      "typeVersion": 1,
+      "position": [1400, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Resume PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Resume PDF": {
+      "main": [
+        [
+          {
+            "node": "Extract Resume Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Resume Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Resume + JD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Resume + JD": {
+      "main": [
+        [
+          {
+            "node": "Tailor Resume (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tailor Resume (AI)": {
+      "main": [
+        [
+          {
+            "node": "Convert to HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to HTML": {
+      "main": [
+        [
+          {
+            "node": "HTML to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
